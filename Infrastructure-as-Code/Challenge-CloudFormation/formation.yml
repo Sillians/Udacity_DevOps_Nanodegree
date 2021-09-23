@@ -1,0 +1,303 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 
+
+  Networks infrastructure
+
+  You have been tasked with creating the required 
+  Infrastructure-as-code scripts for a new cloud environment in AWS.
+
+Parameters:
+  EnvironmentName:
+    Description: Environment name, used as a prefix for resources
+    Type: String
+
+  # Project:
+  #   Description: Project name, used for resources tagging
+  #   Type: String
+
+  VpcCIDR:
+    Description: CIRD IP range for the VPC (default - 10.0.0.0/16)
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnetCIDR:
+    Description: CIRD IP range for the public subnet
+    Type: String
+    Default: 10.0.1.0/24
+
+  PrivateSubnetCIDR:
+    Description: CIRD IP range for the private subnet 
+    Type: String
+    Default: 10.0.2.0/24
+
+Resources:
+
+  # A virtual private cloud (VPC) is a virtual network dedicated to a AWS account.
+  # It is logically isolated from other virtual networks in the AWS Cloud. You can launch
+  # a AWS resources, such as Amazon EC2 instances, into a VPC. When you create a VPC,
+  # you must specify a range of IPv4 addresses for the VPC in the form of a
+  # Classless Inter-Domain Routing (CIDR) block; for example, 10.0.0.0/16.
+  # This is the primary CIDR block for your VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  # Gateway for connecting VPC to internet
+  # Provides a target in a VPC route tables for internet-routable traffic,
+  # and performs network address translation (NAT) for instances that have
+  # been assigned public IPv4 addresses
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  # Attaches an internet gateway, or a virtual private gateway to a VPC,
+  # enabling connectivity between the internet and the VPC
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+
+# A VPC spans all of the Availability Zones in the Region. After creating a VPC,
+# you can add one or more subnets in each Availability Zone
+
+# When you create a subnet, you specify the CIDR block for the subnet, which is a subset
+# of the VPC CIDR block. Each subnet must reside entirely within one Availability Zone
+# and cannot span zones
+
+# ------------ Availability Zone 1 -------------------
+# ----------------------------------------------------
+
+  # Public sub network
+  Public:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+
+
+  # Private sub network
+  Private:
+    Type: AWS::EC2::Subnet
+    Properties:
+        VpcId: !Ref VPC
+        AvailabilityZone: !Select [ 1, !GetAZs '' ]
+        CidrBlock: !Ref PrivateSubnetCIDR
+        MapPublicIpOnLaunch: false
+        Tags:
+          - Key: Name
+            Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+
+
+  # Specifies an Elastic IP (EIP) address and can, optionally, associate it with an Amazon EC2 instance
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachment
+    Properties:
+        Domain: vpc
+
+  # Enables instances in a private subnet to connect to the internet or other AWS services,
+  # but prevent the internet from initiating connections with the instances. A NAT device forwards
+  # traffic from the instances in the private subnet to the internet or other AWS services,
+  # and then sends the response back to the instances. When traffic goes to the internet, the source
+  # IPv4 address is replaced with the NAT device’s address and similarly, when the response traffic
+  # goes to those instances, the NAT device translates the address back to those instances’ private
+  # IPv4 addresses
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref Public
+      Tags:
+        - Key: Name
+          Value: "NAT Gateway"
+
+
+# ---------- Routing for public routes ---------
+# ----------------------------------------------------
+
+  # Public Route Table
+  # A route table contains a set of rules, called routes, that are used to determine
+  # where network traffic from your subnet or gateway is directed
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name 
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  # Specifies a route in a route table within a VPC.
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # Associates a subnet with a route table. The subnet and route table must be in the same VPC.
+  # This association causes traffic originating from the subnet to be routed according to the
+  # routes in the route table. A route table can be associated with multiple subnets.
+  # Public Subnet 1 to the Route Table
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref Public
+
+  # Public Subnet 2 to the Route Table
+  # PublicSubnet2RouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #       RouteTableId: !Ref PublicRouteTable
+  #       SubnetId: !Ref PublicSubnet2
+
+
+# ---------- Routing for private routes ---------
+# -----------------------------------------------
+
+  # Private Route Table 1
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name 
+        Value: !Sub ${EnvironmentName} Private Routes
+
+  # NAT Gateway 1 route
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  # Private subnet 1 to the private route table 1
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref Private
+
+# ------------- Security Groups ------------
+# ------------------------------------------
+
+# Security group defines rules that reflect the role of the instance that's associated
+# with the security group. For example, an instance that's configured as a web server
+# needs security group rules that allow inbound HTTP and HTTPS access
+
+  # # Load Balancer Security Group
+  # LoadBalancerSecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: Load Balancer HTTP traffic
+  #     GroupName: Load-balancer-security-group
+  #     VpcId: !Ref VPC
+  #     # Outbound
+  #     SecurityGroupIngress:
+  #     - IpProtocol: TCP
+      #   FromPort: 80
+      #   ToPort: 80
+      #   CidrIp: 0.0.0.0/0
+      # # Inbound
+      # SecurityGroupEgress:
+      # - IpProtocol: TCP
+      #   FromPort: 80
+      #   ToPort: 80
+      #   CidrIp: 0.0.0.0/0
+      # Tags:
+      #   - Key: Project
+      #     Value: !Ref Project
+
+  # # Application security group (EC2 Instance)
+  # ApplicationSecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: Application Security Group
+  #     GroupName: Application-security-group
+  #     VpcId: !Ref VPC
+  #     # Inbound
+  #     SecurityGroupIngress:
+  #     - Description: Inbound rule to allow the Load Balancer.
+  #       IpProtocol: TCP
+  #       SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  #       FromPort: 80
+  #       ToPort: 80
+  #     Tags:
+  #       - Key: Project
+  #         Value: !Ref Project
+
+
+# -------------Output ------------
+# --------------------------------
+
+# Outputs:
+#   VPC:
+#     Description: VPC reference
+#     Value: !Ref VPC
+#     Export:
+#       Name: !Sub ${Project}-VPCID
+
+#   PublicSubnets:
+#     Description: Public subnet IDs
+#     Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+#     Export:
+#       Name: !Sub ${Project}-Public-Subnet-IDs
+
+#   PublicSubnetCIDR:
+#     Description: Public Subnet 1 CIDR
+#     Value: !Ref PublicSubnetCIDR
+#     Export:
+#       Name: !Sub ${Project}-Public-Subnet-CIDR
+
+  # PublicSubnet2CIDR:
+  #   Description: Public Subnet 2 CIDR
+  #   Value: !Ref PublicSubnet2CIDR
+  #   Export:
+  #     Name: !Sub ${Project}-Public-Subnet-2-CIDR
+
+  # PublicSubnetID:
+  #   Description: Public Subnet  ID
+  #   Value: !Ref PublicSubnet
+  #   Export:
+  #     Name: !Sub ${Project}-Public-Subnet-ID
+
+  # PublicSubnet2ID:
+  #   Description: Public Subnet 2 ID
+  #   Value: !Ref PublicSubnet2
+  #   Export:
+  #     Name: !Sub ${Project}-Public-Subnet-2-ID
+
+  # PrivateSubnets:
+  #   Description: Private subnet IDs
+  #   Value: !Join [ ",", [ !Ref PrivateSubnet, !Ref PrivateSubnet ]]
+  #   Export:
+  #     Name: !Sub ${Project}-Private-Subnet-IDs
+
+  # ApplicationSecurityGroup:
+  #   Description: Applicaion security group
+  #   Value: !Ref ApplicationSecurityGroup
+  #   Export:
+  #     Name: !Sub ${Project}-AppSecurityGroupID
+
+  # LoadBalancerSecurityGroup:
+  #   Description: Load balancer security group
+  #   Value: !Ref LoadBalancerSecurityGroup
+  #   Export:
+  #     Name: !Sub ${Project}-LBSecurityGroupID
