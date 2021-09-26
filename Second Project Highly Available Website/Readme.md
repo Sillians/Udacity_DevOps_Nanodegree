@@ -19,7 +19,7 @@ Create a Launch Configuration in order to deploy four servers, two located in ea
 
 ## Architecture
 
-![alt text](C:\Users\Sillians\Desktop\Udacity_DevOps_Nanodegree\Second Project Highly Available Website\High-availability-website-infrastructure-diagram.png)
+![High-availability-website-infrastructure-diagram](https://user-images.githubusercontent.com/25388109/134808717-203db33c-cee4-42f3-8693-52df83394c97.png)
 
 
 
