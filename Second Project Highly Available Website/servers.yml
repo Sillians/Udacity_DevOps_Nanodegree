@@ -20,50 +20,6 @@ Parameters:
     Type: String
     Default: ami-00a54827eb7ffcd3c # ami-0fedebff038630644 # Used Ubuntu Server 18.04 LTS
 
-  WebServerVolumeSize:
-    Description: Web server disk volume size
-    Type: String
-    Default: 10
-
-  WebServerInstanceType:
-    AllowedValues:
-      - t2.nano
-      - t2.medium
-      - t2.large
-      - t3.medium
-      - t3.large
-      - t3.xlarge
-      - m1.medium
-      - m1.large
-      - m1.xlarge
-      - m2.xlarge
-      - m2.2xlarge
-      - m2.4xlarge
-      - m3.medium
-      - m3.large
-      - m3.xlarge
-      - m3.2xlarge
-      - m4.large
-      - m4.xlarge
-      - m4.2xlarge
-      - m4.4xlarge
-      - m4.10xlarge
-    ConstraintDescription: Web server instance type. t2.nano - dev instance, t3.medium - default
-    Default: t3.medium
-    Description: WebServer EC2 instance type
-    Type: String
-
-  CPUUsagePercentPolicyTargetValue:
-    Description: Average CPU utilization
-    Type: String
-    Default: 75.0
-
-  ALBRequestCompleteCountTargetValue:
-    Description: Number of requests completed per target in an Application Load Balancer target group.
-                How many requests the application can handle per instance
-    Type: String
-    Default: 3
-
 
 Resources:
 
@@ -128,13 +84,13 @@ Resources:
   UdacityS3ReadOnlyEC2:
     Type: AWS::IAM::Role
     Properties:
-      # ManagedPolicyArns:
-      #   - "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
-          -
-            Effect: "Allow"
+          - Effect: "Allow"
             Principal:
               Service:
                 - "ec2.amazonaws.com"
@@ -151,20 +107,6 @@ Resources:
       Path: "/"
       Roles:
         - !Ref UdacityS3ReadOnlyEC2
-  
-  # An IAM policy that allows EC2 to list items in S3
-  S3BucketsPolicy:
-      Type: AWS::IAM::Policy
-      Properties:
-          PolicyName: S3BucketsPolicy
-          PolicyDocument:
-              Statement:
-                  - Effect: Allow
-                    Action:
-                        - s3:*
-                    Resource: "*"
-          Roles:
-            - !Ref UdacityS3ReadOnlyEC2
   
 
   #----------------- EC2 ------------------
@@ -188,16 +130,15 @@ Resources:
           cd /var/www/html
           aws s3 cp s3://udacity-demo-1/udacity.zip .
           unzip -o udacity.zip         
-      ImageId: !Ref WebServerImageId
+      ImageId: ami-005bdb005fb00e791
       IamInstanceProfile: !Ref ProfileWithRolesForApp
-      KeyName: new-key-pair
       SecurityGroups:
       - Ref: WebServerSecGroup
-      InstanceType: !Ref WebServerInstanceType
+      InstanceType: t3.medium
       BlockDeviceMappings:
       - DeviceName: "/dev/sdk"  # /var/log
         Ebs:
-          VolumeSize: !Ref WebServerVolumeSize
+          VolumeSize: '10'
 
 
   # ------------ Resource groups -----------
@@ -288,37 +229,3 @@ Outputs:
         - {DNSName: !GetAtt 'WebAppLB.DNSName'}
     Export:
       Name: !Sub ${EnvironmentName}-LB-DNSName
-
-
-
-  #---------------- Scaling Policies ---------------
-  #-------------------------------------------------
-
-  # When you configure dynamic scaling, you define how to scale the capacity of your
-  # Auto Scaling group in response to changing demand. For example, let's say that you
-  # have a web application that currently runs on two instances, and you want the CPU
-  # utilization of the Auto Scaling group to stay at around 50 percent when the load
-  # on the application changes. This gives you extra capacity to handle traffic spikes
-  # without maintaining an excessive number of idle resources. You can configure your
-  # Auto Scaling group to scale dynamically to meet this need by creating a scaling policy.
-  # Amazon EC2 Auto Scaling can then scale out your group (add more instances) to deal
-  # with high demand at peak times, and scale in your group (run fewer instances) to reduce
-  # costs during periods of low utilization
-
-  # Specifies an Amazon EC2 Auto Scaling scaling policy so that the Auto Scaling group
-  # can change the number of instances available for your application in response to
-  # changing demand. If you create either a step scaling policy or a simple scaling policy,
-  # you must also create a CloudWatch alarm that monitors a CloudWatch metric for your
-  # Auto Scaling group. Note that you can associate a CloudWatch alarm with only one
-  # scaling policy
-  
-
-  
-  
-
-  
-      
-  
-
-  
-  
