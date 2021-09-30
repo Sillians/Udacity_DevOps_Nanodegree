@@ -20,6 +20,10 @@ Parameters:
     Type: String
     Default: ami-00a54827eb7ffcd3c # ami-0fedebff038630644 # Used Ubuntu Server 18.04 LTS
 
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+
 
 Resources:
 
@@ -32,8 +36,7 @@ Resources:
     Properties:
       GroupDescription: Allow http to our load balancer
       VpcId:
-        Fn::ImportValue:
-          !Sub "${EnvironmentName}-VPCID"
+        Fn::ImportValue: !Sub "${EnvironmentName}-VPCID"
       SecurityGroupIngress: # Allowing inbound traffic on port 80
         - IpProtocol: tcp
           FromPort: 80
@@ -45,13 +48,13 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
+   # Security group for Udagram app servers
   WebServerSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow http to our hosts and SSH from local only
       VpcId:
-        Fn::ImportValue:
-          !Sub "${EnvironmentName}-VPCID"
+        Fn::ImportValue: !Sub "${EnvironmentName}-VPCID"
       SecurityGroupIngress: #Allowing inbound traffic on port 80 for accessing application and on port 22 for SSH in case of troubleshooting any issues.
         - IpProtocol: tcp
           FromPort: 80
