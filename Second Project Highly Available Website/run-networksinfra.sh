@@ -14,8 +14,7 @@ case $ACTION in
     --stack-name $STACK_NAME \
     --template-body file://networkinfra.yml \
     --parameters file://networkinfra-parameters.json \
-    --region=us-east-1 \
-    --profile UdacityLab
+    --region=us-west-2
     ;;
 
   update)
@@ -23,15 +22,13 @@ case $ACTION in
     --stack-name $STACK_NAME \
     --template-body file://networkinfra.yml \
     --parameters file://networkinfra-parameters.json \
-    --region=us-east-1 \
-    --profile UdacityLab
+    --region=us-west-2
     ;;
 
   delete)
     aws cloudformation delete-stack \
     --stack-name $STACK_NAME \
-    --region=us-east-1 \
-    --profile UdacityLab
+    --region=us-west-2
     ;;
 
   *)
