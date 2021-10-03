@@ -16,7 +16,6 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - run: echo San Francisco, California
-
 jobs:
   build:
     docker:
@@ -35,7 +34,9 @@ workflows:
     jobs:
       - welcome/run
       - print_hello
-      - build
       - print_world:
           requires:
             - print_hello
+      - build:
+          requires:
+            - print_world
