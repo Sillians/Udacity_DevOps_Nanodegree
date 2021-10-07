@@ -33,6 +33,15 @@ jobs:
       - attach_workspace:
           at: ~/
       - run: cat ~/output.txt
+  job_failures:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - run: return Sillians
+      - run: 
+          name: on error
+          command: echo "Sillians there is an error"
+          when: on_fail
 workflows:
   # Name the workflow "welcome"
   welcome:
@@ -46,3 +55,4 @@ workflows:
       - new_job:
           requires:
             - "print_output_file"
+      - job_failures
