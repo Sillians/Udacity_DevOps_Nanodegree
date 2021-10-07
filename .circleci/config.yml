@@ -3,8 +3,8 @@ commands:
   print_pipeline_id:
     steps:
       - run: echo ${CIRCLE_WORKFLOW_ID}
-    environment:
-      CIRCLE_WORKFLOW_ID: workflow
+    # environment:
+    #   CIRCLE_WORKFLOW_ID: workflow
 
 # Use a package of configuration called an orb.
 orbs:
@@ -45,4 +45,4 @@ workflows:
             - save_hello_world_output
       - new_job:
           requires:
-            - print_output_file
+            - "print_output_file"
